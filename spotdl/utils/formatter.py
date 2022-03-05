@@ -5,6 +5,7 @@ from pathlib import Path
 
 from slugify.main import Slugify
 from spotdl.types import Song
+from spotdl.types.song import SongList
 
 VARS = [
     "{title}",
@@ -63,8 +64,8 @@ def format_query(
     template: str,
     santitize: bool,
     file_extension: Optional[str] = None,
+    song_list: Optional[SongList] = None,
     short: bool = False,
-    song_list: Optional[List[Song]] = None,
 ) -> str:
     """
     Replace template variables with the actual values.
@@ -73,13 +74,17 @@ def format_query(
     if "{output-ext}" in template and file_extension is None:
         raise ValueError("file_extension is None, but template contains {output-ext}")
 
-    artists = ", ".join(song.artists)
-    position = (
-        str(song_list.index(song) + 1).zfill(len(str(len(song_list))))
-        if song_list
-        else ""
-    )
+    if (
+        any(k in template for k in ["{list-length}", "{list-position}", "{list-name}"])
+        and song_list is None
+    ):
+        raise ValueError(
+            "song_list is None, but template contains {list-length}, {list-position} or {list-name}"
+        )
 
+    artists = ", ".join(song.artists)
+
+    # the code below is valid, song_list is actually checked for None
     formats = {
         "{title}": song.name,
         "{artists}": song.artists[0] if short is True else artists,
@@ -97,10 +102,21 @@ def format_query(
         "{isrc}": song.isrc,
         "{track-id}": song.song_id,
         "{publisher}": song.publisher,
-        "{list-position}": position,
-        "{list-length}": len(song_list) if song_list else "",
         "{output-ext}": file_extension,
     }
+
+    if song_list and any(
+        k in template for k in ["{list-length}", "{list-position}", "{list-name}"]
+    ):
+        formats.update(
+            {
+                "{list-name}": song_list.name,  # type: ignore
+                "{list-position}": str(song_list.songs.index(song) + 1).zfill(
+                    len(str(song_list.length))
+                ),
+                "{list-length}": song_list.length,
+            }
+        )
 
     if santitize:
         # sanitize the values in formats dict
@@ -133,15 +149,15 @@ def create_search_query(
     if not any(key in template for key in VARS):
         template = "{artist} - {title}" + template
 
-    return format_query(song, template, santitize, file_extension, short)
+    return format_query(song, template, santitize, file_extension, short=short)
 
 
 def create_file_name(
     song: Song,
     template: str,
     file_extension: str,
+    song_list: Optional[SongList] = None,
     short: bool = False,
-    song_list: Optional[List[Song]] = None,
 ) -> Path:
     """
     Create the file name for the song.
@@ -163,7 +179,12 @@ def create_file_name(
         template += ".{output-ext}"
 
     formatted_string = format_query(
-        song, template, True, file_extension, short, song_list=song_list
+        song=song,
+        template=template,
+        santitize=True,
+        file_extension=file_extension,
+        song_list=song_list,
+        short=short,
     )
 
     # Parse template as Path object
@@ -183,7 +204,11 @@ def create_file_name(
     # Check if the file name length is greater than 255
     if len(file.name) > 255:
         return create_file_name(
-            song, template, file_extension, short=True, song_list=song_list
+            song,
+            template,
+            file_extension,
+            song_list,
+            short=True,
         )
 
     return file
@@ -215,3 +240,55 @@ def slugify(value: str, to_lower=True) -> str:
     """
 
     return Slugify(to_lower=to_lower)(value)
+
+
+def create_empty_song(
+    name: Optional[str] = None,
+    artists: Optional[List[str]] = None,
+    album_name: Optional[str] = None,
+    album_artist: Optional[str] = None,
+    genres: Optional[List[str]] = None,
+    disc_number: Optional[int] = None,
+    disc_count: Optional[int] = None,
+    duration: Optional[int] = None,
+    year: Optional[int] = None,
+    date: Optional[str] = None,
+    track_number: Optional[int] = None,
+    tracks_count: Optional[int] = None,
+    isrc: Optional[str] = None,
+    song_id: Optional[str] = None,
+    cover_url: Optional[str] = None,
+    explicit: Optional[bool] = None,
+    publisher: Optional[str] = None,
+    url: Optional[str] = None,
+    copyright: Optional[str] = None,
+    download_url: Optional[str] = None,
+    song_list: Optional["SongList"] = None,
+) -> Song:
+    """
+    Create an empty song.
+    """
+    return Song(
+        name=name,  # type: ignore
+        artists=artists,  # type: ignore
+        artist=None if artists is None else artists[0],  # type: ignore
+        album_name=album_name,  # type: ignore
+        album_artist=album_artist,  # type: ignore
+        genres=genres,  # type: ignore
+        disc_number=disc_number,  # type: ignore
+        disc_count=disc_count,  # type: ignore
+        duration=duration,  # type: ignore
+        year=year,  # type: ignore
+        date=date,  # type: ignore
+        track_number=track_number,  # type: ignore
+        tracks_count=tracks_count,  # type: ignore
+        isrc=isrc,  # type: ignore
+        song_id=song_id,  # type: ignore
+        cover_url=cover_url,  # type: ignore
+        explicit=explicit,  # type: ignore
+        publisher=publisher,  # type: ignore
+        url=url,  # type: ignore
+        copyright=copyright,
+        download_url=download_url,
+        song_list=song_list,
+    )

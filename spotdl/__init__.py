@@ -101,7 +101,7 @@ class Spotdl:
         Parse a list of queries and return a list of Song objects.
         """
 
-        return parse_query(query, self.downloader.threads)
+        return parse_query(query)
 
     def download(self, song: Song) -> None:
         """

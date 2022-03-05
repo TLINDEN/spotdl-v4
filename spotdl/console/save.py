@@ -15,7 +15,7 @@ def save(
     """
 
     # Parse the query
-    songs = parse_query(query, threads)
+    songs = parse_query(query)
 
     # Convert the songs to JSON
     save_data = [song.json for song in songs]

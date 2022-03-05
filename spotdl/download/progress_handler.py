@@ -409,6 +409,22 @@ class SongTracker:
         self.progress = 100
         self.update(status)
 
+    def notfiy_download_skip(self, status="Skipped") -> None:
+        """
+        Notifies the progress handler that the song has been skipped.
+        """
+
+        self.progress = 100
+        self.update(status)
+
+    def custom_notify(self, status: str, progress: int) -> None:
+        """
+        Notifies the progress handler of a custom status.
+        """
+
+        self.progress = progress
+        self.update(status)
+
     def progress_hook(self, *args, **_) -> None:
         """
         Updates the progress.

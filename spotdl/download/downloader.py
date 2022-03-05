@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from spotdl.types import Song
+from spotdl.types.song import SongList
 from spotdl.utils.ffmpeg import FFmpeg
 from spotdl.utils.ffmpeg import FFmpegError
 from spotdl.utils.metadata import embed_metadata
@@ -168,9 +169,7 @@ class Downloader:
             url,
         )
 
-    async def download_song_async(
-        self, song: Song, song_list: Optional[List[Song]] = None
-    ) -> Tuple[Song, Optional[Path]]:
+    async def download_song_async(self, song: Song) -> Tuple[Song, Optional[Path]]:
         """
         Download a song to the temp directory.
         After that convert the song to the output format with ffmpeg.
@@ -190,8 +189,37 @@ class Downloader:
             filter_results=self.filter_results,
         )
 
+        # Check if we have all the metadata
+        # and that the song object is not a placeholder
+        # If it's None extract the current metadata
+        # And reinitialize the song object
+        if song.name is None and song.url:
+            data = song.json
+            new_data = Song.from_url(data["url"]).json
+            data.update((k, v) for k, v in new_data.items() if v is not None)
+            song = Song(**data)
+
+        output_file = create_file_name(
+            song, self.output, self.output_format, song.song_list
+        )
+
         # Initalize the progress tracker
         display_progress_tracker = self.progress_handler.get_new_tracker(song)
+
+        # Check if the song is already downloaded
+        # If overwrite is set to skip, skip the song
+        if output_file.is_file() and self.overwrite == "skip":
+            display_progress_tracker.notfiy_download_skip()
+            self.progress_handler.log(f"Skipping song: {song.display_name}")
+
+            return song, None
+
+        # Check if the song is already downloaded
+        # If overwrite is set to overwrite, overwrite the song
+        if output_file.is_file() and self.overwrite == "force":
+            display_progress_tracker.custom_notify("Overwriting song", 5)
+            pass
+
         audio_provider.add_progress_hook(display_progress_tracker.progress_hook)
         try:
             # Perform the actual download
@@ -219,9 +247,6 @@ class Downloader:
 
             display_progress_tracker.notify_download_complete()
 
-            output_file = create_file_name(
-                song, self.output, self.output_format, song_list=song_list
-            )
             if output_file.exists() is False:
                 output_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -287,14 +312,12 @@ class Downloader:
         Download multiple songs asynchronously.
         """
 
-        tasks = [self.pool_download(song, songs) for song in songs]
+        tasks = [self.pool_download(song) for song in songs]
 
         # call all task asynchronously, and wait until all are finished
         return list(self.loop.run_until_complete(asyncio.gather(*tasks)))
 
-    async def pool_download(
-        self, song: Song, song_list: Optional[List[Song]] = None
-    ) -> Tuple[Song, Optional[Path]]:
+    async def pool_download(self, song: Song) -> Tuple[Song, Optional[Path]]:
         """
         Run asynchronous task in a pool to make sure that all processes
         don't run at once.
@@ -303,4 +326,4 @@ class Downloader:
         # tasks that cannot acquire semaphore will wait here until it's free
         # only certain amount of tasks can acquire the semaphore at the same time
         async with self.semaphore:
-            return await self.download_song_async(song, song_list)
+            return await self.download_song_async(song)

@@ -20,7 +20,7 @@ def sync(
     """
 
     # Parse the query
-    songs_list = parse_query(query, downloader.threads)
+    songs_list = parse_query(query)
 
     if m3u_file:
         create_m3u_file(

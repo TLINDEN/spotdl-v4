@@ -18,7 +18,7 @@ def preload(
     """
 
     # Parse the query
-    songs = parse_query(query, downloader.threads)
+    songs = parse_query(query)
 
     # Initialize the audio provider
     audio_provider: AudioProvider = downloader.audio_provider_class(
