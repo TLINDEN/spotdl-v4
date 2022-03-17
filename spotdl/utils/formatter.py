@@ -1,8 +1,8 @@
 import re
-import itertools
 
 from typing import List, Optional
 from pathlib import Path
+from yt_dlp.utils import sanitize_filename
 
 from slugify.main import Slugify
 from spotdl.types import Song
@@ -218,53 +218,11 @@ def slugify(value: str, to_lower=True) -> str:
     return Slugify(to_lower=to_lower)(value)
 
 
-# needed for sanitizing filenames in restricted mode
-ACCENT_CHARS = dict(zip('ÂÃÄÀÁÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖŐØŒÙÚÛÜŰÝÞßàáâãäåæçèéêëìíîïðñòóôõöőøœùúûüűýþÿ',
-                        itertools.chain('AAAAAA', ['AE'], 'CEEEEIIIIDNOOOOOOO', ['OE'], 'UUUUUY', ['TH', 'ss'],
-                                        'aaaaaa', ['ae'], 'ceeeeiiiionooooooo', ['oe'], 'uuuuuy', ['th'], 'y')))
-
 def restrict_filename(pathobj):
-    """Sanitizes a string so it could be used as part of a filename.
-    If restricted is set, use a stricter subset of allowed characters.
-    Set is_id if this is not an arbitrary string, but an ID that should be kept
-    if possible.
+    """Sanitizes the filename part of a Path object. Returns modified object.
     """
-    # from: https://github.com/ytdl-org/youtube-dl/blob/master/youtube_dl/utils.py
-    def replace_insane(char):
-        if char in ACCENT_CHARS:
-            return ACCENT_CHARS[char]
-        if char == '?' or ord(char) < 32 or ord(char) == 127:
-            return ''
-        elif char == '"':
-            return ''
-        elif char == ':':
-            return '_-'
-        elif char in '\\/|*<>':
-            return '_'
-        if (char in '!&\'()[]{}$;`^,#' or char.isspace()):
-            return '_'
-        if ord(char) > 127:
-            return '_'
-        return char
 
-    # Handle timestamps
-    result = re.sub(r'[0-9]+(?::[0-9]+)+', lambda m: m.group(0).replace(':', '_'), pathobj.name)
-
-    # apply replacements
-    result = ''.join(map(replace_insane, result))
-
-    while '__' in result:
-        result = result.replace('__', '_')
-
-    result = result.strip('_')
-    # Common case of "Foreign band name - English song title"
-    if result.startswith('-_'):
-        result = result[2:]
-
-    if result.startswith('-'):
-        result = '_' + result[len('-'):]
-
-    result = result.lstrip('.')
+    result = sanitize_filename(pathobj.name, True, False)
     result = result.replace('_-_', '-')
 
     if not result:
