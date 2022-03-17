@@ -218,8 +218,9 @@ def slugify(value: str, to_lower=True) -> str:
     return Slugify(to_lower=to_lower)(value)
 
 
-def restrict_filename(pathobj):
-    """Sanitizes the filename part of a Path object. Returns modified object.
+def restrict_filename(pathobj: Path) -> Path:
+    """
+    Sanitizes the filename part of a Path object. Returns modified object.
     """
 
     result = sanitize_filename(pathobj.name, True, False)
